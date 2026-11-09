@@ -1,0 +1,7 @@
+{
+  "greeting": {
+    "hello": "Hello World!",
+    "welcome": "Welcome to the NestJS Training API"
+  }
+}
+
