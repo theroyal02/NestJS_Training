@@ -2,6 +2,15 @@
   "greeting": {
     "hello": "Xin chào thế giới!",
     "welcome": "Chào mừng bạn đến với API NestJS Training"
+  },
+  "auth": {
+    "email_exists": "Địa chỉ email đã được đăng ký",
+    "invalid_credentials": "Email hoặc mật khẩu không chính xác",
+    "unauthorized": "Truy cập không được ủy quyền",
+    "missing_token": "Thiếu mã xác thực (token)",
+    "invalid_token": "Mã xác thực không hợp lệ hoặc đã hết hạn",
+    "token_revoked": "Mã xác thực đã bị thu hồi",
+    "registered_successfully": "Đăng ký tài khoản thành công",
+    "logged_out": "Đăng xuất thành công"
   }
 }
-
