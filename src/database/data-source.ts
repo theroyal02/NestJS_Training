@@ -17,4 +17,3 @@ export const AppDataSource = new DataSource({
 });
 
 export default AppDataSource;
-

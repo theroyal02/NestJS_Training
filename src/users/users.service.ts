@@ -10,6 +10,10 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
+  async checkEmailExists(email: string): Promise<boolean> {
+    return this.usersRepository.exists({ where: { email } });
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
   }
@@ -23,4 +27,3 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 }
-

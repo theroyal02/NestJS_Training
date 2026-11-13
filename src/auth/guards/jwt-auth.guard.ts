@@ -8,20 +8,11 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { RedisService } from '../../redis/redis.service.js';
+import { AUTH_BEARER_SCHEME } from '../auth.constants.js';
+import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface.js';
+import { JwtPayload } from '../interfaces/jwt-payload.interface.js';
 
-export interface JwtPayload {
-  sub: number;
-  email: string;
-  jti: string;
-  exp?: number;
-  iat?: number;
-}
-
-export interface AuthenticatedRequest extends Request {
-  user: JwtPayload;
-}
-
-const AUTH_BEARER_SCHEME = 'Bearer ';
+export type { AuthenticatedRequest, JwtPayload };
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -76,4 +67,3 @@ export class JwtAuthGuard implements CanActivate {
     return authHeader.substring(AUTH_BEARER_SCHEME.length).trim();
   }
 }
-

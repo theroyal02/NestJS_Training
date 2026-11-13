@@ -17,10 +17,8 @@ import {
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
-import {
-  type AuthenticatedRequest,
-  JwtAuthGuard,
-} from './guards/jwt-auth.guard.js';
+import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
+import { type AuthenticatedRequest } from './interfaces/authenticated-request.interface.js';
 
 @ApiTags('Authentication')
 @Controller('api/auth')
@@ -75,4 +73,3 @@ export class AuthController {
     return this.authService.getCurrentUser(req.user.sub);
   }
 }
-

@@ -9,12 +9,13 @@ import { randomUUID } from 'crypto';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { RedisService } from '../redis/redis.service.js';
 import { UsersService } from '../users/users.service.js';
+import {
+  BCRYPT_SALT_ROUNDS,
+  DEFAULT_TOKEN_LIFETIME_SECONDS,
+  MS_IN_SECOND,
+} from './auth.constants.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
-
-const BCRYPT_SALT_ROUNDS = 10;
-const DEFAULT_TOKEN_LIFETIME_SECONDS = 3600;
-const MS_IN_SECOND = 1000;
 
 @Injectable()
 export class AuthService {
@@ -29,8 +30,9 @@ export class AuthService {
     const lang = I18nContext.current()?.lang;
     const sanitizedEmail = dto.email.trim().toLowerCase();
 
-    const existingUser = await this.usersService.findByEmail(sanitizedEmail);
-    if (existingUser) {
+    const isEmailTaken =
+      await this.usersService.checkEmailExists(sanitizedEmail);
+    if (isEmailTaken) {
       throw new ConflictException(
         this.i18n.t('messages.auth.email_exists', { lang }),
       );
@@ -115,4 +117,3 @@ export class AuthService {
     };
   }
 }
-

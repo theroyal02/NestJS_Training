@@ -11,6 +11,7 @@ import { AuthService } from './auth.service.js';
 describe('AuthService', () => {
   let authService: AuthService;
   let usersService: {
+    checkEmailExists: ReturnType<typeof vi.fn>;
     findByEmail: ReturnType<typeof vi.fn>;
     findById: ReturnType<typeof vi.fn>;
     createUser: ReturnType<typeof vi.fn>;
@@ -28,6 +29,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     usersService = {
+      checkEmailExists: vi.fn(),
       findByEmail: vi.fn(),
       findById: vi.fn(),
       createUser: vi.fn(),
@@ -58,7 +60,7 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('should register a new user successfully with sanitized email', async () => {
-      usersService.findByEmail.mockResolvedValue(null);
+      usersService.checkEmailExists.mockResolvedValue(false);
       usersService.createUser.mockResolvedValue({
         id: 1,
         email: 'user@sun-asterisk.vn',
@@ -73,17 +75,14 @@ describe('AuthService', () => {
       });
 
       expect(result.email).toBe('user@sun-asterisk.vn');
-      expect(usersService.findByEmail).toHaveBeenCalledWith(
+      expect(usersService.checkEmailExists).toHaveBeenCalledWith(
         'user@sun-asterisk.vn',
       );
       expect(usersService.createUser).toHaveBeenCalled();
     });
 
     it('should throw ConflictException when email is already registered', async () => {
-      usersService.findByEmail.mockResolvedValue({
-        id: 1,
-        email: 'user@sun-asterisk.vn',
-      });
+      usersService.checkEmailExists.mockResolvedValue(true);
 
       await expect(
         authService.register({
@@ -177,4 +176,3 @@ describe('AuthService', () => {
     });
   });
 });
-
