@@ -12,5 +12,19 @@
     "token_revoked": "Token has been revoked",
     "registered_successfully": "Account registered successfully",
     "logged_out": "Successfully logged out"
+  },
+  "users": {
+    "user_not_found": "User not found",
+    "email_in_use": "Email address is already in use by another account",
+    "username_in_use": "Username is already taken"
+  },
+  "profiles": {
+    "cannot_follow_self": "You cannot follow yourself",
+    "profile_not_found": "Profile not found"
+  },
+  "attachments": {
+    "file_required": "File is required",
+    "file_too_large": "File size exceeds the 5MB limit",
+    "invalid_file_type": "Invalid file type. Only JPEG, PNG, and WebP are allowed"
   }
 }
