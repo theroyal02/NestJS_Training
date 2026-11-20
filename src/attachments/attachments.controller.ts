@@ -57,16 +57,6 @@ export class AttachmentsController {
     @CurrentUser() user: JwtPayload,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const attachment = await this.attachmentsService.saveUserAvatar(
-      file,
-      user.sub,
-    );
-    return {
-      id: attachment.id,
-      url: attachment.url,
-      fileName: attachment.fileName,
-      fileType: attachment.fileType,
-      fileSize: attachment.fileSize,
-    };
+    return this.attachmentsService.uploadAvatar(file, user.sub);
   }
 }

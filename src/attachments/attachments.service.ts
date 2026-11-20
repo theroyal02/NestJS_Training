@@ -1,3 +1,6 @@
+import * as crypto from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import {
   BadRequestException,
   Injectable,
@@ -5,11 +8,8 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as crypto from 'crypto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { I18nService } from 'nestjs-i18n';
-import { EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Attachment } from '../database/entities/attachment.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import {
@@ -18,13 +18,8 @@ import {
   AVATAR_SUBDIR,
   AVATAR_URL_PREFIX,
   MAX_AVATAR_SIZE_BYTES,
+  MIME_EXTENSION_MAP,
 } from './attachments.constants.js';
-
-const MIME_EXTENSION_MAP: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
 
 @Injectable()
 export class AttachmentsService {
@@ -35,8 +30,20 @@ export class AttachmentsService {
     private readonly attachmentRepository: Repository<Attachment>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly dataSource: DataSource,
     private readonly i18n: I18nService,
   ) {}
+
+  async uploadAvatar(file: Express.Multer.File, userId: number) {
+    const attachment = await this.saveUserAvatar(file, userId);
+    return {
+      id: attachment.id,
+      url: attachment.url,
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
+      fileSize: attachment.fileSize,
+    };
+  }
 
   async saveUserAvatar(
     file: Express.Multer.File,
@@ -55,44 +62,64 @@ export class AttachmentsService {
     await fs.writeFile(absoluteFilePath, file.buffer);
 
     const publicUrl = `${AVATAR_URL_PREFIX}/${fileName}`;
+    const oldFilesToDelete: string[] = [];
 
-    const repo = manager
-      ? manager.getRepository(Attachment)
-      : this.attachmentRepository;
-    const userRepo = manager
-      ? manager.getRepository(User)
-      : this.userRepository;
+    const executeTransaction = async (
+      em: EntityManager,
+    ): Promise<Attachment> => {
+      const repo = em.getRepository(Attachment);
+      const userRepo = em.getRepository(User);
 
-    const oldAttachments = await repo.find({
-      where: {
-        attachableType: ATTACHABLE_TYPE.USER,
+      const oldAttachments = await repo.find({
+        where: {
+          attachableType: ATTACHABLE_TYPE.USER,
+          attachableId: String(userId),
+        },
+      });
+
+      const newAttachment = repo.create({
+        id,
         attachableId: String(userId),
-      },
-    });
+        attachableType: ATTACHABLE_TYPE.USER,
+        url: publicUrl,
+        fileName: this.sanitizeFileName(file.originalname, ext),
+        filePath: relativeFilePath,
+        fileType: mimeType,
+        fileSize: file.size,
+      });
 
-    const newAttachment = repo.create({
-      id,
-      attachableId: String(userId),
-      attachableType: ATTACHABLE_TYPE.USER,
-      url: publicUrl,
-      fileName: this.sanitizeFileName(file.originalname, ext),
-      filePath: relativeFilePath,
-      fileType: mimeType,
-      fileSize: file.size,
-    });
+      const savedAttachment = await repo.save(newAttachment);
+      await userRepo.update(userId, { image: publicUrl });
 
-    const savedAttachment = await repo.save(newAttachment);
-
-    await userRepo.update(userId, { image: publicUrl });
-
-    if (oldAttachments.length > 0) {
-      await repo.delete(oldAttachments.map((a) => a.id));
-      for (const old of oldAttachments) {
-        await this.deleteFileSafely(old.filePath);
+      if (oldAttachments.length > 0) {
+        await repo.delete(oldAttachments.map((a) => a.id));
+        for (const old of oldAttachments) {
+          oldFilesToDelete.push(old.filePath);
+        }
       }
-    }
 
-    return savedAttachment;
+      return savedAttachment;
+    };
+
+    try {
+      let saved: Attachment;
+      if (manager) {
+        saved = await executeTransaction(manager);
+      } else {
+        saved = await this.dataSource.transaction(async (em) => {
+          return executeTransaction(em);
+        });
+      }
+
+      for (const oldPath of oldFilesToDelete) {
+        await this.deleteFileSafely(oldPath);
+      }
+
+      return saved;
+    } catch (error) {
+      await this.deleteFileSafely(relativeFilePath);
+      throw error;
+    }
   }
 
   async deleteFileSafely(filePath: string): Promise<void> {

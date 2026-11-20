@@ -2,6 +2,7 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
+import { DataSource, EntityManager } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Attachment } from '../database/entities/attachment.entity.js';
 import { User } from '../users/entities/user.entity.js';
@@ -24,6 +25,12 @@ describe('AttachmentsService', () => {
   let userRepository: {
     update: ReturnType<typeof vi.fn>;
   };
+  let mockEntityManager: {
+    getRepository: ReturnType<typeof vi.fn>;
+  };
+  let dataSource: {
+    transaction: ReturnType<typeof vi.fn>;
+  };
   let i18nService: {
     t: ReturnType<typeof vi.fn>;
   };
@@ -37,6 +44,18 @@ describe('AttachmentsService', () => {
     };
     userRepository = {
       update: vi.fn().mockResolvedValue({ affected: 1 }),
+    };
+    mockEntityManager = {
+      getRepository: vi.fn((entity) => {
+        if (entity === Attachment) return attachmentRepository;
+        if (entity === User) return userRepository;
+        return {};
+      }),
+    };
+    dataSource = {
+      transaction: vi.fn(async (cb: (em: EntityManager) => Promise<any>) =>
+        cb(mockEntityManager as unknown as EntityManager),
+      ),
     };
     i18nService = {
       t: vi.fn((key: string) => key),
@@ -52,6 +71,10 @@ describe('AttachmentsService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: userRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: dataSource,
         },
         {
           provide: I18nService,
@@ -93,7 +116,7 @@ describe('AttachmentsService', () => {
       );
     });
 
-    it('should successfully save valid JPEG avatar and update user image', async () => {
+    it('should successfully save valid JPEG avatar and update user image inside transaction', async () => {
       const validJpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x11, 0x22]);
       const file = {
         buffer: validJpegBuffer,
@@ -105,12 +128,54 @@ describe('AttachmentsService', () => {
 
       const result = await service.saveUserAvatar(file, 1);
 
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(result.url).toContain('/uploads/avatars/');
       expect(result.fileType).toBe('image/jpeg');
       expect(userRepository.update).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ image: result.url }),
       );
+    });
+
+    it('should delete old attachment records and remove old files safely', async () => {
+      const validPngBuffer = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00,
+      ]);
+      const file = {
+        buffer: validPngBuffer,
+        size: validPngBuffer.length,
+        originalname: 'avatar.png',
+      } as Express.Multer.File;
+
+      attachmentRepository.find.mockResolvedValue([
+        { id: 'old-1', filePath: 'public/uploads/avatars/old.png' },
+      ]);
+
+      const result = await service.saveUserAvatar(file, 1);
+
+      expect(attachmentRepository.delete).toHaveBeenCalledWith(['old-1']);
+      expect(result.url).toContain('/uploads/avatars/');
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    it('should return mapped attachment response', async () => {
+      const validJpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x11, 0x22]);
+      const file = {
+        buffer: validJpegBuffer,
+        size: validJpegBuffer.length,
+        originalname: 'test.jpg',
+      } as Express.Multer.File;
+
+      attachmentRepository.find.mockResolvedValue([]);
+
+      const result = await service.uploadAvatar(file, 1);
+
+      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty('url');
+      expect(result).toHaveProperty('fileName');
+      expect(result.fileType).toBe('image/jpeg');
+      expect(result.fileSize).toBe(validJpegBuffer.length);
     });
   });
 });

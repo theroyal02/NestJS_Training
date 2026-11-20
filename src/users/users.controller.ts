@@ -37,16 +37,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Return current user info' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getCurrentUser(@CurrentUser() user: JwtPayload) {
-    const profile = await this.usersService.findById(user.sub);
-    return {
-      id: profile?.id,
-      email: profile?.email,
-      username: profile?.username,
-      bio: profile?.bio,
-      image: profile?.image,
-      createdAt: profile?.createdAt,
-      updatedAt: profile?.updatedAt,
-    };
+    return this.usersService.getCurrentUser(user.sub);
   }
 
   @Put()

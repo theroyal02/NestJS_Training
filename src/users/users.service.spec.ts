@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
+import { DataSource, EntityManager } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttachmentsService } from '../attachments/attachments.service.js';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface.js';
@@ -22,6 +23,12 @@ describe('UsersService', () => {
   };
   let redisService: {
     setBlacklistToken: ReturnType<typeof vi.fn>;
+  };
+  let dataSource: {
+    transaction: ReturnType<typeof vi.fn>;
+  };
+  let mockEntityManager: {
+    getRepository: ReturnType<typeof vi.fn>;
   };
   let i18nService: {
     t: ReturnType<typeof vi.fn>;
@@ -55,6 +62,17 @@ describe('UsersService', () => {
     i18nService = {
       t: vi.fn((key: string) => key),
     };
+    mockEntityManager = {
+      getRepository: vi.fn((entity) => {
+        if (entity === User) return usersRepository;
+        return {};
+      }),
+    };
+    dataSource = {
+      transaction: vi.fn(async (cb: (em: EntityManager) => Promise<any>) =>
+        cb(mockEntityManager as unknown as EntityManager),
+      ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,6 +90,10 @@ describe('UsersService', () => {
           useValue: redisService,
         },
         {
+          provide: DataSource,
+          useValue: dataSource,
+        },
+        {
           provide: I18nService,
           useValue: i18nService,
         },
@@ -79,6 +101,32 @@ describe('UsersService', () => {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
+  });
+
+  describe('getCurrentUser', () => {
+    it('should return user info when user is found', async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockUser });
+
+      const result = await service.getCurrentUser(1);
+
+      expect(result).toEqual({
+        id: mockUser.id,
+        email: mockUser.email,
+        username: mockUser.username,
+        bio: mockUser.bio,
+        image: mockUser.image,
+        createdAt: mockUser.createdAt,
+        updatedAt: mockUser.updatedAt,
+      });
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      usersRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.getCurrentUser(999)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 
   describe('updateUser', () => {
@@ -118,6 +166,7 @@ describe('UsersService', () => {
         image: 'https://example.com/new.jpg',
       });
 
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(result.bio).toBe('Updated bio');
       expect(result.image).toBe('https://example.com/new.jpg');
       expect(usersRepository.save).toHaveBeenCalled();
@@ -150,7 +199,7 @@ describe('UsersService', () => {
       expect(user.password.startsWith('$2')).toBe(true);
     });
 
-    it('should delegate to attachmentsService when avatar file is passed', async () => {
+    it('should delegate to attachmentsService with transaction manager when avatar file is passed', async () => {
       const user = { ...mockUser };
       usersRepository.findOne.mockResolvedValue(user);
       usersRepository.save.mockImplementation(async (u: User) => u);
@@ -169,6 +218,7 @@ describe('UsersService', () => {
       expect(attachmentsService.saveUserAvatar).toHaveBeenCalledWith(
         mockFile,
         1,
+        expect.anything(),
       );
       expect(result.image).toBe('/uploads/avatars/new.png');
     });
