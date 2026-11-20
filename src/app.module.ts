@@ -10,7 +10,11 @@ import {
 import * as path from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AttachmentsModule } from './attachments/attachments.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { Attachment } from './database/entities/attachment.entity.js';
+import { Follow } from './database/entities/follow.entity.js';
+import { ProfilesModule } from './profiles/profiles.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { User } from './users/entities/user.entity.js';
 import { UsersModule } from './users/users.module.js';
@@ -32,7 +36,7 @@ const DEFAULT_DB_PORT = 5432;
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'password123'),
         database: configService.get<string>('DB_NAME', 'sun_nestjs_db'),
-        entities: [User],
+        entities: [User, Follow, Attachment],
         synchronize: false,
       }),
     }),
@@ -51,6 +55,8 @@ const DEFAULT_DB_PORT = 5432;
     RedisModule,
     UsersModule,
     AuthModule,
+    AttachmentsModule,
+    ProfilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

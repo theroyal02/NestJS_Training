@@ -20,6 +20,15 @@ export class User {
   @Column({ length: 255 })
   password: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  bio: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  image: string | null;
+
+  @Column({ name: 'password_changed_at', type: 'timestamp', nullable: true })
+  passwordChangedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

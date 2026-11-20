@@ -12,5 +12,19 @@
     "token_revoked": "Mã xác thực đã bị thu hồi",
     "registered_successfully": "Đăng ký tài khoản thành công",
     "logged_out": "Đăng xuất thành công"
+  },
+  "users": {
+    "user_not_found": "Không tìm thấy người dùng",
+    "email_in_use": "Địa chỉ email đã được sử dụng bởi tài khoản khác",
+    "username_in_use": "Tên người dùng đã được sử dụng"
+  },
+  "profiles": {
+    "cannot_follow_self": "Bạn không thể theo dõi chính mình",
+    "profile_not_found": "Không tìm thấy thông tin cá nhân người dùng"
+  },
+  "attachments": {
+    "file_required": "Tệp đính kèm là bắt buộc",
+    "file_too_large": "Kích thước tệp vượt quá giới hạn 5MB",
+    "invalid_file_type": "Định dạng tệp không hợp lệ. Chỉ chấp nhận JPEG, PNG hoặc WebP"
   }
 }
