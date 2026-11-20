@@ -2,6 +2,15 @@
   "greeting": {
     "hello": "Hello World!",
     "welcome": "Welcome to the NestJS Training API"
+  },
+  "auth": {
+    "email_exists": "Email address is already registered",
+    "invalid_credentials": "Invalid email or password",
+    "unauthorized": "Unauthorized access",
+    "missing_token": "Authorization token is missing",
+    "invalid_token": "Authorization token is invalid or expired",
+    "token_revoked": "Token has been revoked",
+    "registered_successfully": "Account registered successfully",
+    "logged_out": "Successfully logged out"
   }
 }
-
