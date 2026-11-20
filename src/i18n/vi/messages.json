@@ -26,5 +26,10 @@
     "file_required": "Tệp đính kèm là bắt buộc",
     "file_too_large": "Kích thước tệp vượt quá giới hạn 5MB",
     "invalid_file_type": "Định dạng tệp không hợp lệ. Chỉ chấp nhận JPEG, PNG hoặc WebP"
+  },
+  "articles": {
+    "article_not_found": "Không tìm thấy bài viết",
+    "not_article_author": "Bạn không có quyền chỉnh sửa bài viết này",
+    "favorite_failed": "Cập nhật trạng thái yêu thích bài viết thất bại"
   }
 }
