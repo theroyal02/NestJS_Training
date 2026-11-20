@@ -37,6 +37,7 @@ async function bootstrap() {
     .addTag('User', 'Current user management')
     .addTag('Profiles', 'User profile and follow/unfollow operations')
     .addTag('Attachments', 'File upload and attachment management')
+    .addTag('Articles', 'Article CRUD, feed, and favorites')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
