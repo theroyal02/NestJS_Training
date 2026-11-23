@@ -31,5 +31,10 @@
     "article_not_found": "Không tìm thấy bài viết",
     "not_article_author": "Bạn không có quyền chỉnh sửa bài viết này",
     "favorite_failed": "Cập nhật trạng thái yêu thích bài viết thất bại"
+  },
+  "comments": {
+    "body_required": "Nội dung bình luận không được để trống",
+    "comment_not_found": "Không tìm thấy bình luận",
+    "not_comment_author": "Bạn không có quyền xóa bình luận này"
   }
 }

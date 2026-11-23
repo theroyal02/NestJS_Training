@@ -1,14 +1,22 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
-import type { Request } from 'express';
+import {
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
 @Injectable()
 export class OptionalJwtAuthGuard extends JwtAuthGuard {
-  override async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
-    if (!request.headers.authorization) {
-      return true;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    try {
+      return (await super.canActivate(context)) as boolean;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        const request = context.switchToHttp().getRequest();
+        delete request.user;
+        return true;
+      }
+      throw error;
     }
-    return super.canActivate(context);
   }
 }

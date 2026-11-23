@@ -31,5 +31,10 @@
     "article_not_found": "Article not found",
     "not_article_author": "You are not authorized to modify this article",
     "favorite_failed": "Failed to update article favorite status"
+  },
+  "comments": {
+    "body_required": "Comment body cannot be empty",
+    "comment_not_found": "Comment not found",
+    "not_comment_author": "You are not authorized to delete this comment"
   }
 }
