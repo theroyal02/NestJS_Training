@@ -1,23 +1,26 @@
 import {
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ArticleFavorite } from '../database/entities/article-favorite.entity.js';
 import { ArticleTag } from '../database/entities/article-tag.entity.js';
 import { Article } from '../database/entities/article.entity.js';
 import { Follow } from '../database/entities/follow.entity.js';
 import { Tag } from '../database/entities/tag.entity.js';
 import { User } from '../users/entities/user.entity.js';
+import {
+  DEFAULT_ARTICLES_LIMIT,
+  TAG_NAME_MAX_LENGTH,
+} from './articles.constants.js';
 import { CreateArticleDto } from './dto/create-article.dto.js';
 import { FeedArticlesQueryDto } from './dto/feed-articles-query.dto.js';
 import { ListArticlesQueryDto } from './dto/list-articles-query.dto.js';
 import { UpdateArticleDto } from './dto/update-article.dto.js';
+import { toArticleResponse } from './helpers/article-mapper.helper.js';
 import { generateSlug } from './helpers/slug.helper.js';
 import {
   ArticleResponse,
@@ -27,8 +30,6 @@ import {
 
 @Injectable()
 export class ArticlesService {
-  private readonly logger = new Logger(ArticlesService.name);
-
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
@@ -62,54 +63,31 @@ export class ArticlesService {
 
     const savedArticle = await this.dataSource.transaction(async (manager) => {
       const articleRepo = manager.getRepository(Article);
-      const tagRepo = manager.getRepository(Tag);
-      const articleTagRepo = manager.getRepository(ArticleTag);
 
       const article = articleRepo.create({
         slug,
-        title: dto.title.trim(),
-        description: dto.description.trim(),
+        title: dto.title,
+        description: dto.description,
         body: dto.body,
         authorId,
       });
       const persistedArticle = await articleRepo.save(article);
 
       if (tagNames.length > 0) {
-        for (const name of tagNames) {
-          let tag = await tagRepo.findOne({ where: { name } });
-          if (!tag) {
-            tag = await tagRepo.save(tagRepo.create({ name }));
-          }
-          await articleTagRepo.save(
-            articleTagRepo.create({
-              articleId: persistedArticle.id,
-              tagId: tag.id,
-            }),
-          );
-        }
+        await this.syncTags(manager, persistedArticle.id, tagNames);
       }
 
+      persistedArticle.author = author;
       return persistedArticle;
     });
 
     return {
-      article: {
-        slug: savedArticle.slug,
-        title: savedArticle.title,
-        description: savedArticle.description,
-        body: savedArticle.body,
-        tagList: tagNames,
-        createdAt: savedArticle.createdAt,
-        updatedAt: savedArticle.updatedAt,
+      article: toArticleResponse(savedArticle, {
         favorited: false,
         favoritesCount: 0,
-        author: {
-          username: author.username,
-          bio: author.bio,
-          image: author.image,
-          following: false,
-        },
-      },
+        following: false,
+        tagList: tagNames,
+      }),
     };
   }
 
@@ -147,28 +125,12 @@ export class ArticlesService {
         : Promise.resolve(false),
     ]);
 
-    const tagList = (article.articleTags || [])
-      .map((at) => at.tag?.name)
-      .filter((name): name is string => Boolean(name));
-
     return {
-      article: {
-        slug: article.slug,
-        title: article.title,
-        description: article.description,
-        body: article.body,
-        tagList,
-        createdAt: article.createdAt,
-        updatedAt: article.updatedAt,
+      article: toArticleResponse(article, {
         favorited: isFavorited,
         favoritesCount,
-        author: {
-          username: article.author.username,
-          bio: article.author.bio,
-          image: article.author.image,
-          following: isFollowing,
-        },
-      },
+        following: isFollowing,
+      }),
     };
   }
 
@@ -198,15 +160,13 @@ export class ArticlesService {
 
     const updated = await this.dataSource.transaction(async (manager) => {
       const articleRepo = manager.getRepository(Article);
-      const tagRepo = manager.getRepository(Tag);
-      const articleTagRepo = manager.getRepository(ArticleTag);
 
-      if (dto.title && dto.title.trim() !== article.title) {
-        article.title = dto.title.trim();
+      if (dto.title && dto.title !== article.title) {
+        article.title = dto.title;
         article.slug = generateSlug(article.title);
       }
       if (dto.description !== undefined) {
-        article.description = dto.description.trim();
+        article.description = dto.description;
       }
       if (dto.body !== undefined) {
         article.body = dto.body;
@@ -215,19 +175,7 @@ export class ArticlesService {
       const saved = await articleRepo.save(article);
 
       if (tagNames !== null) {
-        await articleTagRepo.delete({ articleId: article.id });
-        for (const name of tagNames) {
-          let tag = await tagRepo.findOne({ where: { name } });
-          if (!tag) {
-            tag = await tagRepo.save(tagRepo.create({ name }));
-          }
-          await articleTagRepo.save(
-            articleTagRepo.create({
-              articleId: article.id,
-              tagId: tag.id,
-            }),
-          );
-        }
+        await this.syncTags(manager, article.id, tagNames);
       }
 
       return saved;
@@ -287,7 +235,7 @@ export class ArticlesService {
       );
     }
 
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? DEFAULT_ARTICLES_LIMIT;
     const offset = query.offset ?? 0;
 
     qb.orderBy('article.createdAt', 'DESC');
@@ -320,7 +268,7 @@ export class ArticlesService {
     }
 
     const followingIds = follows.map((f) => f.followingId);
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? DEFAULT_ARTICLES_LIMIT;
     const offset = query.offset ?? 0;
 
     const [articles, articlesCount] = await this.articleRepository.findAndCount(
@@ -360,27 +308,13 @@ export class ArticlesService {
       );
     }
 
-    try {
-      const existingFav = await this.favoriteRepository.findOne({
-        where: { userId, articleId: article.id },
-      });
-      if (!existingFav) {
-        await this.favoriteRepository.save(
-          this.favoriteRepository.create({ userId, articleId: article.id }),
-        );
-      }
-    } catch (error: any) {
-      // Catch duplicate entry code or re-throw
-      if (error?.code !== 'ER_DUP_ENTRY' && error?.errno !== 1062) {
-        this.logger.error(
-          `Failed to favorite article ${slug} for user ${userId}`,
-          error?.stack || error,
-        );
-        throw new InternalServerErrorException(
-          this.i18n.t('messages.articles.favorite_failed'),
-        );
-      }
-    }
+    await this.favoriteRepository
+      .createQueryBuilder()
+      .insert()
+      .into(ArticleFavorite)
+      .values({ userId, articleId: article.id })
+      .orIgnore()
+      .execute();
 
     return this.getArticleBySlug(slug, userId);
   }
@@ -398,6 +332,37 @@ export class ArticlesService {
 
     await this.favoriteRepository.delete({ userId, articleId: article.id });
     return this.getArticleBySlug(slug, userId);
+  }
+
+  private async syncTags(
+    manager: EntityManager,
+    articleId: number,
+    tagNames: string[],
+  ): Promise<void> {
+    const articleTagRepo = manager.getRepository(ArticleTag);
+    await articleTagRepo.delete({ articleId });
+
+    if (tagNames.length === 0) return;
+
+    const tagRepo = manager.getRepository(Tag);
+    await tagRepo
+      .createQueryBuilder()
+      .insert()
+      .into(Tag)
+      .values(tagNames.map((name) => ({ name })))
+      .orIgnore()
+      .execute();
+
+    const tags = await tagRepo.find({ where: { name: In(tagNames) } });
+    if (tags.length > 0) {
+      await articleTagRepo
+        .createQueryBuilder()
+        .insert()
+        .into(ArticleTag)
+        .values(tags.map((tag) => ({ articleId, tagId: tag.id })))
+        .orIgnore()
+        .execute();
+    }
   }
 
   private async buildArticlesResponseList(
@@ -441,29 +406,13 @@ export class ArticlesService {
     const favoritedSet = new Set(viewerFavorites.map((f) => f.articleId));
     const followingSet = new Set(viewerFollows.map((f) => f.followingId));
 
-    return articles.map((article) => {
-      const tagList = (article.articleTags || [])
-        .map((at) => at.tag?.name)
-        .filter((name): name is string => Boolean(name));
-
-      return {
-        slug: article.slug,
-        title: article.title,
-        description: article.description,
-        body: article.body,
-        tagList,
-        createdAt: article.createdAt,
-        updatedAt: article.updatedAt,
+    return articles.map((article) =>
+      toArticleResponse(article, {
         favorited: favoritedSet.has(article.id),
         favoritesCount: countMap.get(article.id) || 0,
-        author: {
-          username: article.author?.username || '',
-          bio: article.author?.bio || null,
-          image: article.author?.image || null,
-          following: followingSet.has(article.authorId),
-        },
-      };
-    });
+        following: followingSet.has(article.authorId),
+      }),
+    );
   }
 
   private sanitizeTags(tags?: string[]): string[] {
@@ -472,7 +421,7 @@ export class ArticlesService {
       ...new Set(
         tags
           .map((t) => (typeof t === 'string' ? t.trim().toLowerCase() : ''))
-          .filter((t) => t.length > 0 && t.length <= 50),
+          .filter((t) => t.length > 0 && t.length <= TAG_NAME_MAX_LENGTH),
       ),
     ];
   }

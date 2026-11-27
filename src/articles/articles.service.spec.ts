@@ -23,21 +23,16 @@ describe('ArticlesService', () => {
     createQueryBuilder: ReturnType<typeof vi.fn>;
   };
   let tagRepository: {
-    findOne: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-    save: ReturnType<typeof vi.fn>;
+    find: ReturnType<typeof vi.fn>;
+    createQueryBuilder: ReturnType<typeof vi.fn>;
   };
   let articleTagRepository: {
-    create: ReturnType<typeof vi.fn>;
-    save: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    createQueryBuilder: ReturnType<typeof vi.fn>;
   };
   let favoriteRepository: {
-    findOne: ReturnType<typeof vi.fn>;
     count: ReturnType<typeof vi.fn>;
     exists: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-    save: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
     createQueryBuilder: ReturnType<typeof vi.fn>;
@@ -57,6 +52,24 @@ describe('ArticlesService', () => {
   };
   let i18nService: {
     t: ReturnType<typeof vi.fn>;
+  };
+
+  let mockInsertQueryBuilder: {
+    insert: ReturnType<typeof vi.fn>;
+    into: ReturnType<typeof vi.fn>;
+    values: ReturnType<typeof vi.fn>;
+    orIgnore: ReturnType<typeof vi.fn>;
+    execute: ReturnType<typeof vi.fn>;
+  };
+
+  let mockArticleListQueryBuilder: {
+    leftJoinAndSelect: ReturnType<typeof vi.fn>;
+    innerJoin: ReturnType<typeof vi.fn>;
+    andWhere: ReturnType<typeof vi.fn>;
+    orderBy: ReturnType<typeof vi.fn>;
+    skip: ReturnType<typeof vi.fn>;
+    take: ReturnType<typeof vi.fn>;
+    getManyAndCount: ReturnType<typeof vi.fn>;
   };
 
   const mockAuthor = {
@@ -80,6 +93,24 @@ describe('ArticlesService', () => {
   } as unknown as Article;
 
   beforeEach(async () => {
+    mockInsertQueryBuilder = {
+      insert: vi.fn().mockReturnThis(),
+      into: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      orIgnore: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue({ identifiers: [] }),
+    };
+
+    mockArticleListQueryBuilder = {
+      leftJoinAndSelect: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      andWhere: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      skip: vi.fn().mockReturnThis(),
+      take: vi.fn().mockReturnThis(),
+      getManyAndCount: vi.fn().mockResolvedValue([[mockArticle], 1]),
+    };
+
     articleRepository = {
       findOne: vi.fn(),
       findAndCount: vi.fn(),
@@ -98,27 +129,35 @@ describe('ArticlesService', () => {
         }),
       ),
       delete: vi.fn().mockResolvedValue({ affected: 1 }),
-      createQueryBuilder: vi.fn(),
+      createQueryBuilder: vi.fn(() => mockArticleListQueryBuilder),
     };
     tagRepository = {
-      findOne: vi.fn(),
-      create: vi.fn((data) => ({ ...data, id: 1 })),
-      save: vi.fn((entity) => Promise.resolve({ ...entity, id: 1 })),
+      find: vi.fn().mockResolvedValue([
+        { id: 1, name: 'dragons' },
+        { id: 2, name: 'fantasy' },
+      ]),
+      createQueryBuilder: vi.fn(() => mockInsertQueryBuilder),
     };
     articleTagRepository = {
-      create: vi.fn((data) => data),
-      save: vi.fn((entity) => Promise.resolve(entity)),
       delete: vi.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: vi.fn(() => mockInsertQueryBuilder),
     };
+
+    const mockFavoriteSelectQueryBuilder = {
+      select: vi.fn().mockReturnThis(),
+      addSelect: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      groupBy: vi.fn().mockReturnThis(),
+      getRawMany: vi.fn().mockResolvedValue([]),
+      insert: vi.fn(() => mockInsertQueryBuilder),
+    };
+
     favoriteRepository = {
-      findOne: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
       exists: vi.fn().mockResolvedValue(false),
-      create: vi.fn((data) => data),
-      save: vi.fn((entity) => Promise.resolve(entity)),
       delete: vi.fn().mockResolvedValue({ affected: 1 }),
       find: vi.fn().mockResolvedValue([]),
-      createQueryBuilder: vi.fn(),
+      createQueryBuilder: vi.fn(() => mockFavoriteSelectQueryBuilder),
     };
     followRepository = {
       find: vi.fn().mockResolvedValue([]),
@@ -182,9 +221,8 @@ describe('ArticlesService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should create article with tags inside transaction', async () => {
+    it('should create article with batch-synced tags inside transaction', async () => {
       userRepository.findOne.mockResolvedValue(mockAuthor);
-      tagRepository.findOne.mockResolvedValue(null);
 
       const result = await service.createArticle(1, {
         title: 'New Dragon Story',
@@ -194,9 +232,59 @@ describe('ArticlesService', () => {
       });
 
       expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockInsertQueryBuilder.orIgnore).toHaveBeenCalled();
       expect(result.article.title).toBe('New Dragon Story');
       expect(result.article.tagList).toEqual(['dragons', 'fantasy']);
       expect(result.article.author.username).toBe('author_john');
+    });
+  });
+
+  describe('listArticles', () => {
+    it('should filter by tag, author, favorited and apply pagination', async () => {
+      mockArticleListQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockArticle],
+        3,
+      ]);
+
+      const result = await service.listArticles(
+        {
+          tag: 'dragons',
+          author: 'author_john',
+          favorited: 'fan_user',
+          limit: 1,
+          offset: 2,
+        },
+        2,
+      );
+
+      expect(mockArticleListQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'filterArticleTag.tag',
+        'filterTag',
+        'filterTag.name = :tagName',
+        { tagName: 'dragons' },
+      );
+      expect(mockArticleListQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'author.username = :authorUsername',
+        { authorUsername: 'author_john' },
+      );
+      expect(mockArticleListQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'filterFav.user',
+        'favoritedUser',
+        'favoritedUser.username = :favoritedUsername',
+        { favoritedUsername: 'fan_user' },
+      );
+      expect(mockArticleListQueryBuilder.skip).toHaveBeenCalledWith(2);
+      expect(mockArticleListQueryBuilder.take).toHaveBeenCalledWith(1);
+      expect(result.articles).toHaveLength(1);
+      expect(result.articlesCount).toBe(3);
+    });
+
+    it('should return empty list and 0 count when no articles match', async () => {
+      mockArticleListQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.listArticles({});
+
+      expect(result).toEqual({ articles: [], articlesCount: 0 });
     });
   });
 
@@ -215,10 +303,7 @@ describe('ArticlesService', () => {
       favoriteRepository.exists.mockResolvedValue(true);
       followRepository.exists.mockResolvedValue(true);
 
-      const result = await service.getArticleBySlug(
-        'dragon-training-abc123',
-        2,
-      );
+      const result = await service.getArticleBySlug('dragon-training-abc123', 2);
 
       expect(result.article.slug).toBe('dragon-training-abc123');
       expect(result.article.favoritesCount).toBe(5);
@@ -237,7 +322,6 @@ describe('ArticlesService', () => {
     });
 
     it('should update article inside transaction when authorized', async () => {
-      articleRepository.findOne.mockResolvedValue({ ...mockArticle });
       const updatedArticle = {
         ...mockArticle,
         title: 'Updated Title',
@@ -275,13 +359,13 @@ describe('ArticlesService', () => {
   });
 
   describe('favoriteArticle', () => {
-    it('should save favorite record and return updated article', async () => {
+    it('should insert favorite using orIgnore and return updated article', async () => {
       articleRepository.findOne.mockResolvedValue(mockArticle);
-      favoriteRepository.findOne.mockResolvedValue(null);
 
       const result = await service.favoriteArticle('dragon-training-abc123', 2);
 
-      expect(favoriteRepository.save).toHaveBeenCalled();
+      expect(mockInsertQueryBuilder.orIgnore).toHaveBeenCalled();
+      expect(mockInsertQueryBuilder.execute).toHaveBeenCalled();
       expect(result.article.slug).toBe('dragon-training-abc123');
     });
   });
