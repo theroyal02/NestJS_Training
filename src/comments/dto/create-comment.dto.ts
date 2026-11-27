@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 import {
   IsNotEmpty,
   IsObject,
-  IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
@@ -12,6 +11,9 @@ import { COMMENT_BODY_MAX_LENGTH } from '../comments.constants.js';
 
 export class CommentPayloadDto {
   @ApiProperty({ example: 'Thank you for this insightful article!' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsNotEmpty()
   @IsString()
   @MaxLength(COMMENT_BODY_MAX_LENGTH)
@@ -19,20 +21,10 @@ export class CommentPayloadDto {
 }
 
 export class CreateCommentDto {
-  @ApiPropertyOptional({ type: CommentPayloadDto })
-  @IsOptional()
+  @ApiProperty({ type: CommentPayloadDto })
   @ValidateNested()
   @IsObject()
+  @IsNotEmpty()
   @Type(() => CommentPayloadDto)
-  comment?: CommentPayloadDto;
-
-  @ApiPropertyOptional({ example: 'Thank you for this insightful article!' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(COMMENT_BODY_MAX_LENGTH)
-  body?: string;
-
-  extractBody(): string {
-    return (this.comment?.body || this.body || '').trim();
-  }
+  comment: CommentPayloadDto;
 }

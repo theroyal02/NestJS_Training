@@ -12,8 +12,6 @@ export class OptionalJwtAuthGuard extends JwtAuthGuard {
       return (await super.canActivate(context)) as boolean;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
-        const request = context.switchToHttp().getRequest();
-        delete request.user;
         return true;
       }
       throw error;

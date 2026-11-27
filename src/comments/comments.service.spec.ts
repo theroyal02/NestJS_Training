@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
@@ -100,17 +96,8 @@ describe('CommentsService', () => {
   });
 
   describe('addComment', () => {
-    it('should throw BadRequestException if body is empty', async () => {
-      const dto = new CreateCommentDto();
-
-      await expect(
-        service.addComment('test-article-slug', 1, dto),
-      ).rejects.toThrow(BadRequestException);
-    });
-
     it('should throw NotFoundException if article does not exist', async () => {
-      const dto = new CreateCommentDto();
-      dto.body = 'Valid body';
+      const dto: CreateCommentDto = { comment: { body: 'Valid body' } };
       articleRepository.findOne.mockResolvedValue(null);
 
       await expect(
@@ -119,8 +106,7 @@ describe('CommentsService', () => {
     });
 
     it('should throw NotFoundException if author does not exist', async () => {
-      const dto = new CreateCommentDto();
-      dto.body = 'Valid body';
+      const dto: CreateCommentDto = { comment: { body: 'Valid body' } };
       articleRepository.findOne.mockResolvedValue(mockArticle);
       userRepository.findOne.mockResolvedValue(null);
 
@@ -130,8 +116,7 @@ describe('CommentsService', () => {
     });
 
     it('should add comment successfully and return single comment response', async () => {
-      const dto = new CreateCommentDto();
-      dto.comment = { body: 'Nice work!' };
+      const dto: CreateCommentDto = { comment: { body: 'Nice work!' } };
       articleRepository.findOne.mockResolvedValue(mockArticle);
       userRepository.findOne.mockResolvedValue(mockUser);
 
@@ -162,15 +147,18 @@ describe('CommentsService', () => {
       expect(result.comments).toEqual([]);
     });
 
-    it('should return comments with following status for viewer', async () => {
+    it('should return comments with following status for viewer and preserve empty bio string', async () => {
+      const userWithEmptyBio = { ...mockUser, bio: '' } as User;
+      const commentWithEmptyBio = { ...mockComment, author: userWithEmptyBio };
       articleRepository.findOne.mockResolvedValue(mockArticle);
-      commentRepository.find.mockResolvedValue([mockComment]);
+      commentRepository.find.mockResolvedValue([commentWithEmptyBio]);
       followRepository.find.mockResolvedValue([{ followingId: 1 }]);
 
       const result = await service.getComments('test-article-slug', 2);
 
       expect(result.comments.length).toBe(1);
       expect(result.comments[0].body).toBe('Great article!');
+      expect(result.comments[0].author.bio).toBe('');
       expect(result.comments[0].author.following).toBe(true);
     });
   });

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
 import { In, Repository } from 'typeorm';
+import { toAuthorResponse } from '../articles/helpers/article-mapper.helper.js';
 import { Article } from '../database/entities/article.entity.js';
 import { Comment } from '../database/entities/comment.entity.js';
 import { Follow } from '../database/entities/follow.entity.js';
@@ -36,13 +36,6 @@ export class CommentsService {
     authorId: number,
     dto: CreateCommentDto,
   ): Promise<SingleCommentResponse> {
-    const body = dto.extractBody();
-    if (!body) {
-      throw new BadRequestException(
-        this.i18n.t('messages.comments.body_required'),
-      );
-    }
-
     const article = await this.articleRepository.findOne({
       where: { slug },
       select: { id: true, slug: true },
@@ -61,7 +54,7 @@ export class CommentsService {
     }
 
     const comment = this.commentRepository.create({
-      body,
+      body: dto.comment.body,
       authorId,
       articleId: article.id,
     });
@@ -73,12 +66,7 @@ export class CommentsService {
         createdAt: saved.createdAt,
         updatedAt: saved.updatedAt,
         body: saved.body,
-        author: {
-          username: author.username,
-          bio: author.bio,
-          image: author.image,
-          following: false,
-        },
+        author: toAuthorResponse(author, false),
       },
     };
   }
@@ -123,12 +111,10 @@ export class CommentsService {
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt,
         body: comment.body,
-        author: {
-          username: comment.author?.username || '',
-          bio: comment.author?.bio || null,
-          image: comment.author?.image || null,
-          following: followingSet.has(comment.authorId),
-        },
+        author: toAuthorResponse(
+          comment.author,
+          followingSet.has(comment.authorId),
+        ),
       })),
     };
   }
