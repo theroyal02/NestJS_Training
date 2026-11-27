@@ -13,10 +13,12 @@ import { AppService } from './app.service.js';
 import { ArticlesModule } from './articles/articles.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CommentsModule } from './comments/comments.module.js';
 import { ArticleFavorite } from './database/entities/article-favorite.entity.js';
 import { ArticleTag } from './database/entities/article-tag.entity.js';
 import { Article } from './database/entities/article.entity.js';
 import { Attachment } from './database/entities/attachment.entity.js';
+import { Comment } from './database/entities/comment.entity.js';
 import { Follow } from './database/entities/follow.entity.js';
 import { Tag } from './database/entities/tag.entity.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
@@ -49,6 +51,7 @@ const DEFAULT_DB_PORT = 5432;
           Tag,
           ArticleTag,
           ArticleFavorite,
+          Comment,
         ],
         synchronize: false,
       }),
@@ -71,6 +74,7 @@ const DEFAULT_DB_PORT = 5432;
     AttachmentsModule,
     ProfilesModule,
     ArticlesModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
