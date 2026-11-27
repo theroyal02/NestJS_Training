@@ -15,7 +15,6 @@ import { User } from '../users/entities/user.entity.js';
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   ATTACHABLE_TYPE,
-  AVATAR_SUBDIR,
   AVATAR_URL_PREFIX,
   MAX_AVATAR_SIZE_BYTES,
   MIME_EXTENSION_MAP,
@@ -54,8 +53,10 @@ export class AttachmentsService {
     const ext = MIME_EXTENSION_MAP[mimeType] || 'jpg';
     const id = crypto.randomUUID();
     const fileName = `${id}.${ext}`;
-    const relativeFilePath = path.join(AVATAR_SUBDIR, fileName);
-    const absoluteUploadDir = path.resolve(process.cwd(), AVATAR_SUBDIR);
+    const uploadBaseDir = process.env.UPLOAD_DIR || 'public/uploads';
+    const avatarSubdir = path.join(uploadBaseDir, 'avatars');
+    const relativeFilePath = path.join(avatarSubdir, fileName);
+    const absoluteUploadDir = path.resolve(process.cwd(), avatarSubdir);
     const absoluteFilePath = path.resolve(absoluteUploadDir, fileName);
 
     await fs.mkdir(absoluteUploadDir, { recursive: true });

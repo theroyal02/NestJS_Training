@@ -32,7 +32,8 @@ const DEFAULT_DB_PORT = 5432;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '.env.example'],
+      envFilePath:
+        process.env.NODE_ENV === 'test' ? ['.env.test'] : ['.env', '.env.example'],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
