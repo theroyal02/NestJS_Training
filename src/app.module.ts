@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -7,13 +8,19 @@ import {
   I18nModule,
   QueryResolver,
 } from 'nestjs-i18n';
-import * as path from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { ArticlesModule } from './articles/articles.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CommentsModule } from './comments/comments.module.js';
+import { ArticleFavorite } from './database/entities/article-favorite.entity.js';
+import { ArticleTag } from './database/entities/article-tag.entity.js';
+import { Article } from './database/entities/article.entity.js';
 import { Attachment } from './database/entities/attachment.entity.js';
+import { Comment } from './database/entities/comment.entity.js';
 import { Follow } from './database/entities/follow.entity.js';
+import { Tag } from './database/entities/tag.entity.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { User } from './users/entities/user.entity.js';
@@ -36,7 +43,16 @@ const DEFAULT_DB_PORT = 5432;
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'password123'),
         database: configService.get<string>('DB_NAME', 'sun_nestjs_db'),
-        entities: [User, Follow, Attachment],
+        entities: [
+          User,
+          Follow,
+          Attachment,
+          Article,
+          Tag,
+          ArticleTag,
+          ArticleFavorite,
+          Comment,
+        ],
         synchronize: false,
       }),
     }),
@@ -57,6 +73,8 @@ const DEFAULT_DB_PORT = 5432;
     AuthModule,
     AttachmentsModule,
     ProfilesModule,
+    ArticlesModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

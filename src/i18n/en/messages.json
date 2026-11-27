@@ -26,5 +26,15 @@
     "file_required": "File is required",
     "file_too_large": "File size exceeds the 5MB limit",
     "invalid_file_type": "Invalid file type. Only JPEG, PNG, and WebP are allowed"
+  },
+  "articles": {
+    "article_not_found": "Article not found",
+    "not_article_author": "You are not authorized to modify this article",
+    "favorite_failed": "Failed to update article favorite status"
+  },
+  "comments": {
+    "body_required": "Comment body cannot be empty",
+    "comment_not_found": "Comment not found",
+    "not_comment_author": "You are not authorized to delete this comment"
   }
 }
