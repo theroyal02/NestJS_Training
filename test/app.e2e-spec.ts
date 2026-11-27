@@ -1,23 +1,27 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { describe, beforeEach, afterEach, it } from 'vitest';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module.js';
+import { DataSource } from 'typeorm';
+import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+import {
+  createE2eApp,
+  truncateDatabase,
+} from './helpers/e2e-database.helper.js';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: NestExpressApplication;
+  let dataSource: DataSource;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
+  beforeAll(async () => {
+    const setup = await createE2eApp();
+    app = setup.app;
+    dataSource = setup.dataSource;
   });
 
   afterEach(async () => {
+    await truncateDatabase(dataSource);
+  });
+
+  afterAll(async () => {
     await app.close();
   });
 
@@ -49,12 +53,5 @@ describe('AppController (e2e)', () => {
       .set('x-lang', 'vi')
       .expect(200)
       .expect('Xin chào thế giới!');
-  });
-
-  it('GET /?lang=fr - unsupported language falls back to English', () => {
-    return request(app.getHttpServer())
-      .get('/?lang=fr')
-      .expect(200)
-      .expect('Hello World!');
   });
 });

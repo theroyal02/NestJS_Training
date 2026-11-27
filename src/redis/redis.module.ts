@@ -18,6 +18,7 @@ const DEFAULT_REDIS_PORT = 6379;
           port: Number(
             configService.get<number>('REDIS_PORT', DEFAULT_REDIS_PORT),
           ),
+          db: Number(configService.get<number>('REDIS_DB', 0)),
           lazyConnect: true,
           retryStrategy: (times: number) => {
             if (times > 3) return null;

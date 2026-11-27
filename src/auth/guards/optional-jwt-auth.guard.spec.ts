@@ -1,5 +1,6 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { I18nService } from 'nestjs-i18n';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisService } from '../../redis/redis.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
@@ -13,7 +14,8 @@ describe('OptionalJwtAuthGuard', () => {
     const redisService = {
       isTokenBlacklisted: vi.fn(),
     } as unknown as RedisService;
-    guard = new OptionalJwtAuthGuard(jwtService, redisService);
+    const i18nService = { t: vi.fn() } as unknown as I18nService;
+    guard = new OptionalJwtAuthGuard(jwtService, redisService, i18nService);
   });
 
   const createMockContext = (user?: unknown): ExecutionContext => {
